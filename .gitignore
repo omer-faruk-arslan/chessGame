@@ -9,7 +9,7 @@ out/
 *.exe
 
 # Logs
-*.log
+*.log       
 
 # IDE / Editor files
 .vscode/
