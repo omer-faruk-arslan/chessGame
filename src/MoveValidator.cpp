@@ -1,4 +1,4 @@
-#include "MoveValidator.h"
+#include "../include/MoveValidator.h"
 
 
 bool MoveValidator::is_valid(bool round_player_white,Move move,std::vector<std::vector<Piece>> board){

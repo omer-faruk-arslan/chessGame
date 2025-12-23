@@ -1,8 +1,8 @@
 CXX = g++ -std=c++17  
 CXXFLAGS = -O2 -Wall 
 CXXDEBUG = -g -O0
-SRC = *.cpp
-TARGET = runner
+SRC = ./src/*.cpp
+TARGET = ./bin/runner
 
 all: $(TARGET)
 
@@ -15,7 +15,7 @@ debug: $(SRC)
 
 
 run: $(TARGET)
-	./$(TARGET)
-
+	$(TARGET)
+  
 clean: 
 	rm -f $(TARGET)

@@ -1,4 +1,4 @@
-#include "Menu.h"
+#include "../include/Menu.h"
 
 Move Menu::take_input(){
     bool input_taken = false;
