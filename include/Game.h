@@ -3,7 +3,6 @@
 #include <utility>
 #include <iostream>
 #include "Move.h"
-#include "MoveValidator.h"
 #include "Piece.h"
 
 const int board_size = 8;
@@ -20,21 +19,17 @@ class Game {
     std::vector<std::vector<std::pair<int,int>>> black_pieces; // piece -> position
 
     void init_game_board_and_pieces();
-
+    
     public:    
-
+    
     /* constructor of game */
     Game();
     /* gives a move and a copy of the game board to the validator in order to check wheter the move is valid*/
     bool is_valid_move(Move move) const;
-    /* if game is ended updates game_state and winner */
-    bool check_game_end();
+    bool is_ended() const;
     void apply_move(Move move);
     void update_round();
     void print_board() const;
-
-
-
 
 //--------------------------------Getter,Setter--------------------------------------//
 

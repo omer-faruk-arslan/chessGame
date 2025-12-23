@@ -15,7 +15,8 @@ const std::string representList[] = {"Pw","Rk","Hr","Bs","Qn","Kg"};
 
 enum Color{
     white,
-    black
+    black,
+    none
 };
 
 class Piece{
@@ -30,7 +31,7 @@ class Piece{
     public:
     Piece(){};
 
-    Piece(PieceType type_,Color color_,int piece_number_): type(type_), color(color_), piece_number(piece_number_) {
+    Piece(PieceType type_,Color color_=Color::none,int piece_number_=-1): type(type_), color(color_), piece_number(piece_number_) {
         if(type == PieceType::empty) represent = " o ";
         else represent = ((color == Color::white) ? "w" : "b" ) + representList[static_cast<int>(type)];    
     }

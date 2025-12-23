@@ -1,7 +1,6 @@
 #include "../include/Game.h"
 
 
-
 void Game::init_game_board_and_pieces(){
     game_board.resize(board_size,std::vector<Piece>(board_size));
     black_pieces.resize(6);
@@ -72,7 +71,6 @@ void Game::init_game_board_and_pieces(){
 
 }
 
-
 Game::Game(){
     game_round = 0;
     game_state = true;
@@ -82,18 +80,17 @@ Game::Game(){
 
 
 bool Game::is_valid_move(Move move) const{
-    return MoveValidator::is_valid(game_round%2,move,get_game_board());
-}
-
-bool Game::check_game_end(){
-    bool game_ended = MoveValidator::is_ended(game_round%2,get_game_board());
-    if(!game_ended) return false;
-    // update winner
     return true;
 }
 
+bool Game::is_ended() const{
+    return false;
+}
+
+
 void Game::apply_move(Move move){
-    // applies move to board
+    game_board[move.to.first][move.to.second] = game_board[move.from.first][move.from.second];
+    game_board[move.from.first][move.from.second] = Piece(PieceType::empty);
 }
 
 void Game::update_round(){
@@ -102,9 +99,14 @@ void Game::update_round(){
 
 void Game::print_board() const{
     std::cout << "-------Game Board-------" << std::endl;
+    std::cout << "  " ;
     for(int i=0;i<board_size;i++){
+        std::cout << " " << char('a'+i) << "  "; 
+    }std::cout << std::endl;
+    for(int i=0;i<board_size;i++){
+        std::cout << board_size-i << " " ;
         for(int j=0;j<board_size;j++){
-            std::cout << game_board[i][j].get_represent() << " " ;
+            std::cout  << game_board[i][j].get_represent() << " " ;
         }std::cout << std::endl;
     }
 

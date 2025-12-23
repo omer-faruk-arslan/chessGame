@@ -6,13 +6,9 @@ using namespace std;
 
 class Menu {
     private:
+    
     Game game;
-
-    /**
-     * Takes input from user 
-    */
     Move take_input();
-
     void game_loop();
 
     public:
