@@ -2,6 +2,7 @@
 build/
 bin/
 out/
+test/
 
 # Compiled files
 *.o

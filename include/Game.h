@@ -15,19 +15,26 @@ class Game {
     int winner;  // 1 white wins 2 black wins 0 draw -1 not ended
     
     std::vector<std::vector<Piece>> game_board; // pos -> piece 
-    std::vector<std::vector<std::pair<int,int>>> white_pieces; // piece -> position
-    std::vector<std::vector<std::pair<int,int>>> black_pieces; // piece -> position
+    std::vector<std::vector<std::pair<int,int>>> white_pieces; // piece -> position , if piece gone -1 -1 
+    std::vector<std::vector<std::pair<int,int>>> black_pieces; // piece -> position , if piece gone -1 -1
 
     void init_game_board_and_pieces();
+
+    bool points_legal_move(const Move move) const;
+    bool piece_able_to_move(const Move move) const;
+    bool king_checked_move(const Move move) const;
     
+
+    bool in_range(const std::pair<int,int>& position) const;
+
     public:    
     
     /* constructor of game */
     Game();
     /* gives a move and a copy of the game board to the validator in order to check wheter the move is valid*/
-    bool is_valid_move(Move move) const;
+    bool is_valid_move(const Move move) const;
     bool is_ended() const;
-    void apply_move(Move move);
+    void apply_move(const Move move);
     void update_round();
     void print_board() const;
 

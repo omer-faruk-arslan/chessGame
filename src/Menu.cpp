@@ -2,16 +2,16 @@
 
 Move Menu::take_input(){
     bool input_taken = false;
-    pair<int,int> from_pair;
-    pair<int,int> to_pair;
+    std::pair<int,int> from_pair;
+    std::pair<int,int> to_pair;
 
     while(!input_taken){
-        std::cout << "Player : " << ((game.get_game_round()%2)?"white":"black" ) << endl;
+        
         std::cout << "Enter coordinates (from to): " ;
-        string from,to;cin>>from>>to;
+        std::string from,to;std::cin>>from>>to;
         
         if(from.size() != 2 || to.size() != 2 ) {
-            std::cout << "Invalid input! Enter (letter)(number). " << endl;
+            std::cout << "Invalid input! Enter (letter)(number). " << std::endl;
             continue;
         }
         from_pair = {board_size-(from[1]-'0'),from[0]-'a'};
@@ -21,7 +21,7 @@ Move Menu::take_input(){
                 || to_pair.first<0 || to_pair.first>=board_size
                 || to_pair.second<0 || to_pair.second>=board_size) 
         {
-            std::cout << "Invalid input! input out of board. " << endl;
+            std::cout << "Invalid input! input out of board. " << std::endl;
             continue;
         }
 
@@ -36,9 +36,11 @@ void Menu::game_loop(){
         game.update_round();
         game.print_board();
         Move round_move;
-        while(true){
+        bool move_is_valid = false;
+        while(!move_is_valid){
             round_move = take_input();
-            if(game.is_valid_move(round_move)) break;
+            if(game.is_valid_move(round_move)) move_is_valid = true;
+            else std::cout << "Move is invalid!" << std::endl;
         }
         game.apply_move(round_move); 
 

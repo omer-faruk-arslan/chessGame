@@ -2,7 +2,6 @@
 #include <bits/stdc++.h>
 #include "Game.h"
 #include "Move.h"
-using namespace std;
 
 class Menu {
     private:
