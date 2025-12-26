@@ -1,6 +1,5 @@
 #include "../include/Game.h"
 
-
 void Game::init_game_board_and_pieces(){
     game_board.resize(board_size,std::vector<Piece>(board_size,Piece(PieceType::empty)));
     black_pieces.resize(6);
@@ -71,103 +70,8 @@ void Game::init_game_board_and_pieces(){
 
 }
 
-Game::Game(){
-    game_round = 0;
-    game_state = true;
-    winner = -1;
-    init_game_board_and_pieces();
-}
-
-
-bool Game::is_valid_move(const Move move) const{
-
-    // check1
-    // moving piece 
-    // target piece 
-    if(!points_legal_move(move)){
-        std::cout << "Invalid Move!\n";
-        return false; 
-    }
-
-    // check2
-    // piece ability to move
-    if(!piece_able_to_move(move)){{
-        std::cout << "Invalid piece move!\n";
-        return false; 
-    }}
-    // check3 
-    // does players king has checked
-    if(king_checked_move(move)){
-        std::cout << "King is checked!\n";
-        return false; 
-    }
-
-    return true;
-}
-
-bool Game::is_ended() const{
-    return false;
-}
-
-
-void Game::apply_move(Move move){
-    
-    Piece playing_piece = game_board[move.from.first][move.from.second];
-    Piece target_piece = game_board[move.to.first][move.to.second];
-
-    // update piece lists !!!
-    if(target_piece.get_piece_type() != PieceType::empty){
-        if(target_piece.get_color() == Color::white){
-            white_pieces[static_cast<int>(target_piece.get_piece_type())][target_piece.get_piece_number()] = {-1,-1}; 
-        }else{
-            black_pieces[static_cast<int>(target_piece.get_piece_type())][target_piece.get_piece_number()] = {-1,-1}; 
-        }
-    }
-    
-    if(playing_piece.get_color() == Color::white){
-        white_pieces[static_cast<int>(playing_piece.get_piece_type())][playing_piece.get_piece_number()] = {move.to.first,move.to.second}; 
-    }else{
-        black_pieces[static_cast<int>(playing_piece.get_piece_type())][playing_piece.get_piece_number()] = {move.to.first,move.to.second}; 
-    }
-    
-    game_board[move.to.first][move.to.second] = game_board[move.from.first][move.from.second];
-    game_board[move.from.first][move.from.second] = Piece(PieceType::empty);
-}
-
-void Game::update_round(){
-    this->game_round++;
-}
-
-void Game::print_board() const{
-    std::cout << "-------Game Board-------" << std::endl;
-    std::cout << "  " ;
-    for(int i=0;i<board_size;i++){
-        std::cout << " " << char('a'+i) << "  "; 
-    }std::cout << std::endl;
-    for(int i=0;i<board_size;i++){
-        std::cout << board_size-i << " " ;
-        for(int j=0;j<board_size;j++){
-            std::cout  << game_board[i][j].get_represent() << " " ;
-        }std::cout << std::endl;
-    }
-    std::cout << "Player : " << ((game_round%2)?"white ":"black " ) << 
-                    "| Round : " << (game_round+1)/2 << std::endl;
-
-}
-
-bool Game::get_game_state() const{
-    return this->game_state;
-}
-
-std::vector<std::vector<Piece>> Game::get_game_board() const{
-    return game_board;
-}
-
-int Game::get_game_round() const{
-    return this->game_round;
-}
-
 bool Game::points_legal_move(const Move move) const{
+    if(!in_range(move.from) || !in_range(move.to)) return false;
     Piece playing_piece = game_board[move.from.first][move.from.second];
     Piece target_piece = game_board[move.to.first][move.to.second];
     bool player_is_white = (game_round%2==1);
@@ -321,29 +225,25 @@ bool Game::piece_able_to_move(const Move move) const{
     return true;
 }
 
-bool Game::king_checked_move(const Move move) const{
 
-    // we apply the move to copied game board(not copy of pieces yet ?? );
-    // ! didnt applied to original 
-    std::vector<std::vector<Piece>> copy_game_board = game_board;
-    copy_game_board[move.to.first][move.to.second] = game_board[move.from.first][move.from.second];
-    copy_game_board[move.from.first][move.from.second] = Piece(PieceType::empty);
+bool Game::king_checked_move(const Move move,bool in_state) const{
     
     const bool player_white = game_round%2==1;
     const Color player_color = player_white ? Color::white : Color::black;
     const Color opponent_color = player_white ? Color::black : Color::white;
-
-    // we detect the players kings location
+    std::vector<std::vector<Piece>> copy_game_board = game_board;
     std::pair<int,int> king_pos;
-    std::pair<int,int> threat_pos;
-    if(game_board[move.from.first][move.from.second].get_piece_type() == PieceType::king){
-        king_pos = {move.to.first,move.to.second};
-    }else{
-        king_pos = player_white ? (white_pieces[static_cast<int>(PieceType::king)][0]) : (black_pieces[static_cast<int>(PieceType::king)][0]) ;  
-    }
-    std::cout << (player_white ? "white king pos: " : "black king pos: " ) << king_pos.first << "," << king_pos.second << "\n";
-    
-    // think like king as a super piece and make all moves 
+    std::pair<int,int> threat_pos;    
+
+    if(!in_state){
+        copy_game_board[move.to.first][move.to.second] = game_board[move.from.first][move.from.second];
+        copy_game_board[move.from.first][move.from.second] = Piece(PieceType::empty);
+        if(game_board[move.from.first][move.from.second].get_piece_type() == PieceType::king){
+            king_pos = {move.to.first,move.to.second};
+        }else{
+            king_pos = player_white ? (white_pieces[static_cast<int>(PieceType::king)][0]) : (black_pieces[static_cast<int>(PieceType::king)][0]) ;  
+        }
+    }else king_pos = player_white ? (white_pieces[static_cast<int>(PieceType::king)][0]) : (black_pieces[static_cast<int>(PieceType::king)][0]) ;
     
 
 
@@ -426,6 +326,243 @@ bool Game::king_checked_move(const Move move) const{
     return false;
 }
 
+
 bool Game::in_range(const std::pair<int,int>& position) const{
     return( (position.first >= 0 && position.first < board_size) && (position.second >= 0 && position.second < board_size));
 }
+
+bool Game::any_possible_move() const{
+    bool player_is_white = game_round%2==1;
+    const std::vector<std::vector<std::pair<int,int>>>& player_pieces = player_is_white ? white_pieces : black_pieces;
+    
+    // king 
+    std::pair<int,int> current_piece_position; 
+    std::pair<int,int> current_target_position; 
+    current_piece_position = player_pieces[static_cast<int>(PieceType::king)][0];
+    std::vector<int> ways = {-1,0,1};
+    for(int a:ways){
+        for(int b:ways){
+            if(!a && !b) continue;
+            if(is_valid_move(Move(current_piece_position,current_target_position))) return true;
+        }
+    }
+
+    // pawns
+    for(const std::pair<int,int>& pawn_position: player_pieces[static_cast<int>(PieceType::pawn)]){
+        int b = player_is_white ? -1 : 1;
+        if(is_valid_move(Move(pawn_position,{pawn_position.first+1*b,pawn_position.second}))) return true;
+        if(is_valid_move(Move(pawn_position,{pawn_position.first+2*b,pawn_position.second}))) return true;
+        if(is_valid_move(Move(pawn_position,{pawn_position.first+1*b,pawn_position.second+1}))) return true;
+        if(is_valid_move(Move(pawn_position,{pawn_position.first+1*b,pawn_position.second-1}))) return true;
+    }
+    
+    // rook
+    for(const std::pair<int,int>& rook_position: player_pieces[static_cast<int>(PieceType::rook)]){
+        for(int d=1;true;d++){
+            if(!points_legal_move(Move(rook_position,{rook_position.first+d,rook_position.second})) || !piece_able_to_move(Move(rook_position,{rook_position.first+d,rook_position.second}))) break;
+            else if(is_valid_move(Move(rook_position,{rook_position.first+d,rook_position.second}))) return true;
+        }
+        for(int d=1;true;d++){
+            if(!points_legal_move(Move(rook_position,{rook_position.first-d,rook_position.second})) || !piece_able_to_move(Move(rook_position,{rook_position.first-d,rook_position.second}))) break;
+            else if(is_valid_move(Move(rook_position,{rook_position.first-d,rook_position.second}))) return true;
+        }
+        for(int d=1;true;d++){
+            if(!points_legal_move(Move(rook_position,{rook_position.first,rook_position.second+d})) || !piece_able_to_move(Move(rook_position,{rook_position.first,rook_position.second+d}))) break;
+            else if(is_valid_move(Move(rook_position,{rook_position.first,rook_position.second+d}))) return true;
+        }
+        for(int d=1;true;d++){
+            if(!points_legal_move(Move(rook_position,{rook_position.first,rook_position.second-d})) || !piece_able_to_move(Move(rook_position,{rook_position.first,rook_position.second-d}))) break;
+            else if(is_valid_move(Move(rook_position,{rook_position.first,rook_position.second-d}))) return true;
+        }
+    }
+    
+    // horse 
+    for(const std::pair<int,int>& horse_position: player_pieces[static_cast<int>(PieceType::horse)]){
+        for(int a:{-1,1}){
+            for(int b:{-2,2}){
+                if(is_valid_move(Move(horse_position,{horse_position.first+a,horse_position.second+b}))) return true;
+                if(is_valid_move(Move(horse_position,{horse_position.first+b,horse_position.second+a}))) return true;
+            }
+        }
+    }
+    
+    // bishop
+    for(const std::pair<int,int>& bishop_position: player_pieces[static_cast<int>(PieceType::bishop)]){
+        for(int d=1;true;d++){
+            if(!points_legal_move(Move(bishop_position,{bishop_position.first+d,bishop_position.second+d})) || !piece_able_to_move(Move(bishop_position,{bishop_position.first+d,bishop_position.second+d}))) break;
+            else if(is_valid_move(Move(bishop_position,{bishop_position.first+d,bishop_position.second+d}))) return true;
+        }
+        for(int d=1;true;d++){
+            if(!points_legal_move(Move(bishop_position,{bishop_position.first+d,bishop_position.second-d})) || !piece_able_to_move(Move(bishop_position,{bishop_position.first+d,bishop_position.second-d}))) break;
+            else if(is_valid_move(Move(bishop_position,{bishop_position.first+d,bishop_position.second-d}))) return true;
+        }
+        for(int d=1;true;d++){
+            if(!points_legal_move(Move(bishop_position,{bishop_position.first-d,bishop_position.second+d})) || !piece_able_to_move(Move(bishop_position,{bishop_position.first-d,bishop_position.second+d}))) break;
+            else if(is_valid_move(Move(bishop_position,{bishop_position.first-d,bishop_position.second+d}))) return true;
+        }
+        for(int d=1;true;d++){
+            if(!points_legal_move(Move(bishop_position,{bishop_position.first-d,bishop_position.second-d})) || !piece_able_to_move(Move(bishop_position,{bishop_position.first-d,bishop_position.second-d}))) break;
+            else if(is_valid_move(Move(bishop_position,{bishop_position.first-d,bishop_position.second-d}))) return true;
+        }
+    }
+    
+    // queen
+    for(const std::pair<int,int>& queen_position: player_pieces[static_cast<int>(PieceType::queen)]){
+        for(int d=1;true;d++){
+            if(!points_legal_move(Move(queen_position,{queen_position.first+d,queen_position.second})) || !piece_able_to_move(Move(queen_position,{queen_position.first+d,queen_position.second}))) break;
+            else if(is_valid_move(Move(queen_position,{queen_position.first+d,queen_position.second}))) return true;
+        }
+        for(int d=1;true;d++){
+            if(!points_legal_move(Move(queen_position,{queen_position.first-d,queen_position.second})) || !piece_able_to_move(Move(queen_position,{queen_position.first-d,queen_position.second}))) break;
+            else if(is_valid_move(Move(queen_position,{queen_position.first-d,queen_position.second}))) return true;
+        }
+        for(int d=1;true;d++){
+            if(!points_legal_move(Move(queen_position,{queen_position.first,queen_position.second+d})) || !piece_able_to_move(Move(queen_position,{queen_position.first,queen_position.second+d}))) break;
+            else if(is_valid_move(Move(queen_position,{queen_position.first,queen_position.second+d}))) return true;
+        }
+        for(int d=1;true;d++){
+            if(!points_legal_move(Move(queen_position,{queen_position.first,queen_position.second-d})) || !piece_able_to_move(Move(queen_position,{queen_position.first,queen_position.second-d}))) break;
+            else if(is_valid_move(Move(queen_position,{queen_position.first,queen_position.second-d}))) return true;
+        }
+        for(int d=1;true;d++){
+            if(!points_legal_move(Move(queen_position,{queen_position.first+d,queen_position.second+d})) || !piece_able_to_move(Move(queen_position,{queen_position.first+d,queen_position.second+d}))) break;
+            else if(is_valid_move(Move(queen_position,{queen_position.first+d,queen_position.second+d}))) return true;
+        }
+        for(int d=1;true;d++){
+            if(!points_legal_move(Move(queen_position,{queen_position.first+d,queen_position.second-d})) || !piece_able_to_move(Move(queen_position,{queen_position.first+d,queen_position.second-d}))) break;
+            else if(is_valid_move(Move(queen_position,{queen_position.first+d,queen_position.second-d}))) return true;
+        }
+        for(int d=1;true;d++){
+            if(!points_legal_move(Move(queen_position,{queen_position.first-d,queen_position.second+d})) || !piece_able_to_move(Move(queen_position,{queen_position.first-d,queen_position.second+d}))) break;
+            else if(is_valid_move(Move(queen_position,{queen_position.first-d,queen_position.second+d}))) return true;
+        }
+        for(int d=1;true;d++){
+            if(!points_legal_move(Move(queen_position,{queen_position.first-d,queen_position.second-d})) || !piece_able_to_move(Move(queen_position,{queen_position.first-d,queen_position.second-d}))) break;
+            else if(is_valid_move(Move(queen_position,{queen_position.first-d,queen_position.second-d}))) return true;
+        }
+    }
+    return false;
+}
+
+Game::Game(){
+    game_round = 1;
+    game_state = 0;
+    winner = -1;
+    init_game_board_and_pieces();
+}
+
+bool Game::is_valid_move(const Move move) const{
+
+    // check1
+    // moving piece 
+    // target piece 
+    if(!points_legal_move(move)){
+        std::cout << "Invalid Move!\n";
+        return false; 
+    }
+
+    // check2
+    // piece ability to move
+    if(!piece_able_to_move(move)){{
+        std::cout << "Invalid piece move!\n";
+        return false; 
+    }}
+    // check3 
+    // does players king has checked
+    if(king_checked_move(move)){
+        std::cout << "King is checked!\n";
+        return false; 
+    }
+
+    return true;
+}
+
+bool Game::is_ended(){
+
+    bool is_checked = king_checked_move(Move(),true); // instate check
+    std::cout << "next player is " <<( game_round%2 ? "white" : "black") ;
+    std::cout << " End of the round is next checked -> " << is_checked << std::endl;
+
+    // test all reachable positions and move if they break the check
+    bool any_move_found = any_possible_move();
+
+    if(!any_move_found){
+        bool player_is_white = game_round%2==1;
+        if(is_checked)  game_state = player_is_white ? 2 : 1 ;
+        else            game_state = 3 ;
+        return true;
+    }
+    else return false;
+};
+
+
+void Game::apply_move(Move move){
+    
+    Piece playing_piece = game_board[move.from.first][move.from.second];
+    Piece target_piece = game_board[move.to.first][move.to.second];
+
+    // update piece lists !!!
+    if(target_piece.get_piece_type() != PieceType::empty){
+        if(target_piece.get_color() == Color::white){
+            white_pieces[static_cast<int>(target_piece.get_piece_type())][target_piece.get_piece_number()] = {-1,-1}; 
+        }else{
+            black_pieces[static_cast<int>(target_piece.get_piece_type())][target_piece.get_piece_number()] = {-1,-1}; 
+        }
+    }
+    
+    if(playing_piece.get_color() == Color::white){
+        white_pieces[static_cast<int>(playing_piece.get_piece_type())][playing_piece.get_piece_number()] = {move.to.first,move.to.second}; 
+    }else{
+        black_pieces[static_cast<int>(playing_piece.get_piece_type())][playing_piece.get_piece_number()] = {move.to.first,move.to.second}; 
+    }
+    
+    game_board[move.to.first][move.to.second] = game_board[move.from.first][move.from.second];
+    game_board[move.from.first][move.from.second] = Piece(PieceType::empty);
+}
+
+void Game::update_round(){
+    this->game_round++;
+}
+
+void Game::print_board() const{
+    std::cout << "-------Game Board-------" << std::endl;
+    std::cout << "  " ;
+    for(int i=0;i<board_size;i++){
+        std::cout << " " << char('a'+i) << "  "; 
+    }std::cout << std::endl;
+    for(int i=0;i<board_size;i++){
+        std::cout << board_size-i << " " ;
+        for(int j=0;j<board_size;j++){
+            std::cout  << game_board[i][j].get_represent() << " " ;
+        }std::cout << std::endl;
+    }
+    std::cout << "Player : " << ((game_round%2)?"white ":"black " ) << 
+                    "| Round : " << (game_round+1)/2 << std::endl;
+
+}
+
+void Game::result() const{
+    std::cout << "--Game Has Ended--" << std::endl ; 
+    if(game_state == 3){
+        std::cout << "Result: Stalemate !" << std::endl ; 
+    }else{
+        std::cout << "Result: " << (game_state == 1 ? "White" : "Black ") << " has won the game !" << std::endl ; 
+    }
+    print_board();
+}
+
+bool Game::get_game_state() const{
+    return this->game_state;
+}
+
+std::vector<std::vector<Piece>> Game::get_game_board() const{
+    return game_board;
+}
+
+int Game::get_game_round() const{
+    return this->game_round;
+}
+
+
+
+

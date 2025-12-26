@@ -32,8 +32,8 @@ Move Menu::take_input(){
 
 void Menu::game_loop(){
     
-    while(game.get_game_state()){
-        game.update_round();
+    bool is_ended = false;
+    while(!is_ended){
         game.print_board();
         Move round_move;
         bool move_is_valid = false;
@@ -43,11 +43,10 @@ void Menu::game_loop(){
             else std::cout << "Move is invalid!" << std::endl;
         }
         game.apply_move(round_move); 
-
-        game.is_ended(); // updates game state 
+        game.update_round();
+        is_ended = game.is_ended(); // updates game state 
     } 
-
-    //game.result();
+    game.result();
 }
 
 

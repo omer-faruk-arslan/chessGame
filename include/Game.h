@@ -11,7 +11,7 @@ class Game {
     private:
 
     int game_round; // odd white
-    bool game_state; // true active , false pasive(ended)
+    int game_state; // 0 continue , 1 checkmate white win , 2 checkmate black win , 3 4 statlemate
     int winner;  // 1 white wins 2 black wins 0 draw -1 not ended
     
     std::vector<std::vector<Piece>> game_board; // pos -> piece 
@@ -22,21 +22,23 @@ class Game {
 
     bool points_legal_move(const Move move) const;
     bool piece_able_to_move(const Move move) const;
-    bool king_checked_move(const Move move) const;
+    bool king_checked_move(const Move move,bool in_state=false) const;
     
-
+    
     bool in_range(const std::pair<int,int>& position) const;
+    /** checks wheter any piece of current player can make any valid move */
+    bool any_possible_move() const;
 
     public:    
-    
     /* constructor of game */
     Game();
     /* gives a move and a copy of the game board to the validator in order to check wheter the move is valid*/
     bool is_valid_move(const Move move) const;
-    bool is_ended() const;
+    bool is_ended();
     void apply_move(const Move move);
     void update_round();
     void print_board() const;
+    void result() const;
 
 //--------------------------------Getter,Setter--------------------------------------//
 
