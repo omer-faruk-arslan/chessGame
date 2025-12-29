@@ -1,5 +1,4 @@
 #pragma once
-#include <bits/stdc++.h>
 #include "Game.h"
 #include "Move.h"
 

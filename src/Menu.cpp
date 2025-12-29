@@ -7,7 +7,7 @@ Move Menu::take_input(){
 
     while(!input_taken){
         
-        std::cout << "Enter coordinates (from to): " ;
+        std::cout << "Enter coordinates (from to): \n" ;
         std::string from,to;std::cin>>from>>to;
         
         if(from.size() != 2 || to.size() != 2 ) {

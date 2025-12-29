@@ -100,6 +100,7 @@ bool Game::piece_able_to_move(const Move move) const{
         if(player_is_white){
             if(abs(dj) > 1) return false;
             else if(abs(dj) == 1){ // pawn attack
+                if(di != -1) return false;
                 if(target_piece.get_color() != opponent_color) return false;
             }
             else{
@@ -119,6 +120,7 @@ bool Game::piece_able_to_move(const Move move) const{
         }else{
             if(abs(dj) > 1) return false;
             else if(abs(dj) == 1){ // pawn attack
+                if(di != 1) return false;
                 if(target_piece.get_color() != opponent_color) return false;
             }
             else{
@@ -166,7 +168,7 @@ bool Game::piece_able_to_move(const Move move) const{
         
     case PieceType::bishop :
     {
-        if(dj==0 || abs(di/dj) != 1) return false;
+        if(abs(di) != abs(dj)) return false;
         int sl_row = di/abs(di);
         int sl_col = dj/abs(dj);
         for(int c_i=move.from.first+sl_row,c_j=move.from.second+sl_col;
@@ -181,7 +183,7 @@ bool Game::piece_able_to_move(const Move move) const{
     case PieceType::queen :
     {
         if(di && dj){ // diagonel
-            if(dj==0 || abs(di/dj) != 1) return false;
+            if(abs(di) != abs(dj)) return false;
             int sl_row = di/abs(di);
             int sl_col = dj/abs(dj);
             for(int c_i=move.from.first+sl_row,c_j=move.from.second+sl_col;
@@ -211,7 +213,7 @@ bool Game::piece_able_to_move(const Move move) const{
         
     case PieceType::king :
     {
-        if( !(abs(di)+abs(dj) == 1 || (abs(di)==1 && abs(dj)==1)) ) return false;
+        if (abs(di) > 1 || abs(dj) > 1) return false;
         break;
     }
         
@@ -223,107 +225,170 @@ bool Game::piece_able_to_move(const Move move) const{
     }//switch ends
 
     return true;
-}
+} 
 
 
-bool Game::king_checked_move(const Move move,bool in_state) const{
-    
-    const bool player_white = game_round%2==1;
-    const Color player_color = player_white ? Color::white : Color::black;
+std::pair<int,std::pair<int,int>> Game::king_checked_move(const Move move, bool in_state)
+{
+    int check_count = 0;
+    std::pair<int,int> check_pos;
+
+    const bool player_white = game_round % 2 == 1;
+    const Color player_color   = player_white ? Color::white : Color::black;
     const Color opponent_color = player_white ? Color::black : Color::white;
-    std::vector<std::vector<Piece>> copy_game_board = game_board;
+
+    Piece rewind_from(PieceType::empty);
+    Piece rewind_to(PieceType::empty);
+
     std::pair<int,int> king_pos;
-    std::pair<int,int> threat_pos;    
+    std::pair<int,int> threat_pos;
 
+    bool rewound = false;
+
+    auto rewind = [&]() {
+        if(!rewound && !in_state){
+            game_board[move.from.first][move.from.second] = rewind_from;
+            game_board[move.to.first][move.to.second] = rewind_to;
+            rewound = true;
+        }
+    };
+
+    // ---- simulate move if needed ----
     if(!in_state){
-        copy_game_board[move.to.first][move.to.second] = game_board[move.from.first][move.from.second];
-        copy_game_board[move.from.first][move.from.second] = Piece(PieceType::empty);
-        if(game_board[move.from.first][move.from.second].get_piece_type() == PieceType::king){
-            king_pos = {move.to.first,move.to.second};
-        }else{
-            king_pos = player_white ? (white_pieces[static_cast<int>(PieceType::king)][0]) : (black_pieces[static_cast<int>(PieceType::king)][0]) ;  
+        rewind_from = game_board[move.from.first][move.from.second];
+        rewind_to   = game_board[move.to.first][move.to.second];
+
+        if(rewind_from.get_piece_type() == PieceType::king){
+            king_pos = move.to;
+        } else {
+            king_pos = player_white
+                ? white_pieces[static_cast<int>(PieceType::king)][0]
+                : black_pieces[static_cast<int>(PieceType::king)][0];
         }
-    }else king_pos = player_white ? (white_pieces[static_cast<int>(PieceType::king)][0]) : (black_pieces[static_cast<int>(PieceType::king)][0]) ;
-    
 
+        game_board[move.to.first][move.to.second] = rewind_from;
+        game_board[move.from.first][move.from.second] = Piece(PieceType::empty);
+    }
+    else {
+        king_pos = player_white
+            ? white_pieces[static_cast<int>(PieceType::king)][0]
+            : black_pieces[static_cast<int>(PieceType::king)][0];
+    }
 
-    // threat of pawn
-    int pawn_dir = player_white ? -1 : 1 ;
-    threat_pos = {king_pos.first+pawn_dir,king_pos.second+1};
-    if(in_range(threat_pos) && copy_game_board[threat_pos.first][threat_pos.second].get_piece_type() == PieceType::pawn && copy_game_board[threat_pos.first][threat_pos.second].get_color() == opponent_color) return true;
-    threat_pos = {king_pos.first+pawn_dir,king_pos.second-1};
-    if(in_range(threat_pos) && copy_game_board[threat_pos.first][threat_pos.second].get_piece_type() == PieceType::pawn && copy_game_board[threat_pos.first][threat_pos.second].get_color() == opponent_color) return true;
+    // ---- pawn threats ----
+    int pawn_dir = player_white ? -1 : 1;
+    for(int i : {-1, +1}){
+        threat_pos = {king_pos.first + pawn_dir, king_pos.second + i};
+        if(in_range(threat_pos) &&
+           game_board[threat_pos.first][threat_pos.second].get_piece_type() == PieceType::pawn &&
+           game_board[threat_pos.first][threat_pos.second].get_color() == opponent_color)
+        {
+            if(++check_count > 1){
+                rewind();
+                return {2, {}};
+            }
+            check_pos = threat_pos;
+        }
+    }
 
-    // threat of other king
-    std::vector<int> ways = {-1,0,1};
-    for(int a:ways){
-        for(int b:ways){
+    // ---- king threats ----
+    for(int a : {-1,0,1}){
+        for(int b : {-1,0,1}){
             if(!a && !b) continue;
-            threat_pos = {king_pos.first+a,king_pos.second+b};
-            if(in_range(threat_pos) && copy_game_board[threat_pos.first][threat_pos.second].get_piece_type() == PieceType::king) return true;
-        }
-    }
-    
-    
-    // threat of horse 
-    std::vector<int> l1 = {-1,1};
-    std::vector<int> l2 = {-2,2};
-    for(int a:l1){
-        for(int b:l2){
-            threat_pos = {king_pos.first+a,king_pos.second+b};
-            if(in_range(threat_pos) && copy_game_board[threat_pos.first][threat_pos.second].get_piece_type() == PieceType::horse && copy_game_board[threat_pos.first][threat_pos.second].get_color() == opponent_color) return true;
-            
-            threat_pos = {king_pos.first+b,king_pos.second+a};
-            if(in_range(threat_pos) && copy_game_board[threat_pos.first][threat_pos.second].get_piece_type() == PieceType::horse && copy_game_board[threat_pos.first][threat_pos.second].get_color() == opponent_color) return true;
-        }
-    }
-    
-    
-    // threat of horizontal or vert rook or queen
-    for(int slope:{-1,1}){
-        for(int dj=slope;true;dj+=slope){
-            threat_pos = {king_pos.first,king_pos.second+dj};
-            if(!in_range(threat_pos)) break;
-            Piece current_piece = copy_game_board[threat_pos.first][threat_pos.second];
-    
-            if(current_piece.get_piece_type() == PieceType::empty) continue;
-            else if(current_piece.get_color() == player_color) break;
-            else if(current_piece.get_piece_type() == PieceType::rook || current_piece.get_piece_type() == PieceType::queen) return true;
-            else break;
-        }
-    }
-    for(int slope:{-1,1}){
-        for(int di=slope;true;di+=slope){
-            threat_pos = {king_pos.first+di,king_pos.second};
-            if(!in_range(threat_pos)) break;
-            Piece current_piece = copy_game_board[threat_pos.first][threat_pos.second];
-            
-            if(current_piece.get_piece_type() == PieceType::empty) continue;
-            else if(current_piece.get_color() == player_color) break;
-            else if(current_piece.get_piece_type() == PieceType::rook || current_piece.get_piece_type() == PieceType::queen) return true;
-            else break;
-        }
-    }
-    // threat of diagonal bishop or queen
-    for(int si:{-1,+1}){
-        for(int sj:{-1,+1}){
-            int di = si,dj=sj;
-            while(true){
-                threat_pos = {king_pos.first+di,king_pos.second+dj};
-                di+=si;
-                dj+=sj;
-                if(!in_range(threat_pos)) break;
-                Piece current_piece = copy_game_board[threat_pos.first][threat_pos.second];
-                if(current_piece.get_piece_type() == PieceType::empty) continue;
-                else if(current_piece.get_color() == player_color) break;
-                else if(current_piece.get_piece_type() == PieceType::bishop || current_piece.get_piece_type() == PieceType::queen) return true;
-                else break;
+            threat_pos = {king_pos.first + a, king_pos.second + b};
+            if(in_range(threat_pos) &&
+               game_board[threat_pos.first][threat_pos.second].get_piece_type() == PieceType::king)
+            {
+                if(++check_count > 1){
+                    rewind();
+                    return {2, {}};
+                }
+                check_pos = threat_pos;
             }
         }
     }
-    
 
-    return false;
+    // ---- knight threats ----
+    for(int a : {-1,1}){
+        for(int b : {-2,2}){
+            for(auto [di,dj] : std::initializer_list<std::pair<int,int>>{{a,b},{b,a}}){
+                threat_pos = {king_pos.first + di, king_pos.second + dj};
+                if(in_range(threat_pos) &&
+                   game_board[threat_pos.first][threat_pos.second].get_piece_type() == PieceType::horse &&
+                   game_board[threat_pos.first][threat_pos.second].get_color() == opponent_color)
+                {
+                    if(++check_count > 1){
+                        rewind();
+                        return {2, {}};
+                    }
+                    check_pos = threat_pos;
+                }
+            }
+        }
+    }
+
+    // ---- rook / queen (horizontal & vertical) ----
+    for(int slope : {-1, 1}){
+        for(int dj = slope; ; dj += slope){
+            threat_pos = {king_pos.first, king_pos.second + dj};
+            if(!in_range(threat_pos)) break;
+            Piece p = game_board[threat_pos.first][threat_pos.second];
+            if(p.get_piece_type() == PieceType::empty) continue;
+            if(p.get_color() == player_color) break;
+            if(p.get_piece_type() == PieceType::rook || p.get_piece_type() == PieceType::queen){
+                if(++check_count > 1){
+                    rewind();
+                    return {2, {}};
+                }
+                check_pos = threat_pos;
+            }
+            break;
+        }
+    }
+
+    for(int slope : {-1, 1}){
+        for(int di = slope; ; di += slope){
+            threat_pos = {king_pos.first + di, king_pos.second};
+            if(!in_range(threat_pos)) break;
+            Piece p = game_board[threat_pos.first][threat_pos.second];
+            if(p.get_piece_type() == PieceType::empty) continue;
+            if(p.get_color() == player_color) break;
+            if(p.get_piece_type() == PieceType::rook || p.get_piece_type() == PieceType::queen){
+                if(++check_count > 1){
+                    rewind();
+                    return {2, {}};
+                }
+                check_pos = threat_pos;
+            }
+            break;
+        }
+    }
+
+    // ---- bishop / queen (diagonals) ----
+    for(int si : {-1,1}){
+        for(int sj : {-1,1}){
+            for(int step = 1; ; ++step){
+                threat_pos = {king_pos.first + si*step, king_pos.second + sj*step};
+                if(!in_range(threat_pos)) break;
+                Piece p = game_board[threat_pos.first][threat_pos.second];
+                if(p.get_piece_type() == PieceType::empty) continue;
+                if(p.get_color() == player_color) break;
+                if(p.get_piece_type() == PieceType::bishop || p.get_piece_type() == PieceType::queen){
+                    if(++check_count > 1){
+                        rewind();
+                        return {2, {}};
+                    }
+                    check_pos = threat_pos;
+                }
+                break;
+            }
+        }
+    }
+
+    rewind();
+
+    if(check_count == 1) return {1, check_pos};
+    return {0, {}};
 }
 
 
@@ -331,7 +396,7 @@ bool Game::in_range(const std::pair<int,int>& position) const{
     return( (position.first >= 0 && position.first < board_size) && (position.second >= 0 && position.second < board_size));
 }
 
-bool Game::any_possible_move() const{
+bool Game::any_possible_move(){
     bool player_is_white = game_round%2==1;
     const std::vector<std::vector<std::pair<int,int>>>& player_pieces = player_is_white ? white_pieces : black_pieces;
     
@@ -340,15 +405,18 @@ bool Game::any_possible_move() const{
     std::pair<int,int> current_target_position; 
     current_piece_position = player_pieces[static_cast<int>(PieceType::king)][0];
     std::vector<int> ways = {-1,0,1};
-    for(int a:ways){
+
+    for(int a:ways){        
         for(int b:ways){
             if(!a && !b) continue;
+            current_target_position = {current_piece_position.first+a,current_piece_position.second+b};
             if(is_valid_move(Move(current_piece_position,current_target_position))) return true;
         }
     }
 
     // pawns
     for(const std::pair<int,int>& pawn_position: player_pieces[static_cast<int>(PieceType::pawn)]){
+        if(pawn_position.first == -1) continue;
         int b = player_is_white ? -1 : 1;
         if(is_valid_move(Move(pawn_position,{pawn_position.first+1*b,pawn_position.second}))) return true;
         if(is_valid_move(Move(pawn_position,{pawn_position.first+2*b,pawn_position.second}))) return true;
@@ -357,27 +425,23 @@ bool Game::any_possible_move() const{
     }
     
     // rook
+    std::vector<std::pair<int,int>> rook_dirs = {{1,0},{-1,0},{0,1},{0,-1}};
     for(const std::pair<int,int>& rook_position: player_pieces[static_cast<int>(PieceType::rook)]){
-        for(int d=1;true;d++){
-            if(!points_legal_move(Move(rook_position,{rook_position.first+d,rook_position.second})) || !piece_able_to_move(Move(rook_position,{rook_position.first+d,rook_position.second}))) break;
-            else if(is_valid_move(Move(rook_position,{rook_position.first+d,rook_position.second}))) return true;
-        }
-        for(int d=1;true;d++){
-            if(!points_legal_move(Move(rook_position,{rook_position.first-d,rook_position.second})) || !piece_able_to_move(Move(rook_position,{rook_position.first-d,rook_position.second}))) break;
-            else if(is_valid_move(Move(rook_position,{rook_position.first-d,rook_position.second}))) return true;
-        }
-        for(int d=1;true;d++){
-            if(!points_legal_move(Move(rook_position,{rook_position.first,rook_position.second+d})) || !piece_able_to_move(Move(rook_position,{rook_position.first,rook_position.second+d}))) break;
-            else if(is_valid_move(Move(rook_position,{rook_position.first,rook_position.second+d}))) return true;
-        }
-        for(int d=1;true;d++){
-            if(!points_legal_move(Move(rook_position,{rook_position.first,rook_position.second-d})) || !piece_able_to_move(Move(rook_position,{rook_position.first,rook_position.second-d}))) break;
-            else if(is_valid_move(Move(rook_position,{rook_position.first,rook_position.second-d}))) return true;
+        if(rook_position.first == -1) continue;
+        for(auto dir:rook_dirs){
+            Move move;move.from = rook_position;
+            for(int step=1;;step++){
+                move.to.first = rook_position.first+step*dir.first;
+                move.to.second = rook_position.second+step*dir.second;
+                if(!points_legal_move(move) || !piece_able_to_move(move)) break;
+                else if(is_valid_move(move)) return true;
+            }
         }
     }
     
     // horse 
     for(const std::pair<int,int>& horse_position: player_pieces[static_cast<int>(PieceType::horse)]){
+        if(horse_position.first == -1) continue;
         for(int a:{-1,1}){
             for(int b:{-2,2}){
                 if(is_valid_move(Move(horse_position,{horse_position.first+a,horse_position.second+b}))) return true;
@@ -387,58 +451,47 @@ bool Game::any_possible_move() const{
     }
     
     // bishop
+    std::vector<std::pair<int,int>> bishop_dirs = {{1,1},{1,-1},{-1,1},{-1,-1}};
     for(const std::pair<int,int>& bishop_position: player_pieces[static_cast<int>(PieceType::bishop)]){
-        for(int d=1;true;d++){
-            if(!points_legal_move(Move(bishop_position,{bishop_position.first+d,bishop_position.second+d})) || !piece_able_to_move(Move(bishop_position,{bishop_position.first+d,bishop_position.second+d}))) break;
-            else if(is_valid_move(Move(bishop_position,{bishop_position.first+d,bishop_position.second+d}))) return true;
-        }
-        for(int d=1;true;d++){
-            if(!points_legal_move(Move(bishop_position,{bishop_position.first+d,bishop_position.second-d})) || !piece_able_to_move(Move(bishop_position,{bishop_position.first+d,bishop_position.second-d}))) break;
-            else if(is_valid_move(Move(bishop_position,{bishop_position.first+d,bishop_position.second-d}))) return true;
-        }
-        for(int d=1;true;d++){
-            if(!points_legal_move(Move(bishop_position,{bishop_position.first-d,bishop_position.second+d})) || !piece_able_to_move(Move(bishop_position,{bishop_position.first-d,bishop_position.second+d}))) break;
-            else if(is_valid_move(Move(bishop_position,{bishop_position.first-d,bishop_position.second+d}))) return true;
-        }
-        for(int d=1;true;d++){
-            if(!points_legal_move(Move(bishop_position,{bishop_position.first-d,bishop_position.second-d})) || !piece_able_to_move(Move(bishop_position,{bishop_position.first-d,bishop_position.second-d}))) break;
-            else if(is_valid_move(Move(bishop_position,{bishop_position.first-d,bishop_position.second-d}))) return true;
+        if(bishop_position.first == -1) continue;
+        for(auto dir:bishop_dirs){
+            Move move;move.from = bishop_position;
+            for(int step=1;;step++){
+                move.to.first = bishop_position.first+step*dir.first;
+                move.to.second = bishop_position.second+step*dir.second;
+                if(!points_legal_move(move) || !piece_able_to_move(move)) break;
+                else if(is_valid_move(move)) return true;
+            }
         }
     }
     
     // queen
+    std::vector<std::pair<int,int>> queen_dirs = {{1,0},{-1,0},{0,1},{0,-1},{1,1},{1,-1},{-1,1},{-1,-1}};
     for(const std::pair<int,int>& queen_position: player_pieces[static_cast<int>(PieceType::queen)]){
-        for(int d=1;true;d++){
-            if(!points_legal_move(Move(queen_position,{queen_position.first+d,queen_position.second})) || !piece_able_to_move(Move(queen_position,{queen_position.first+d,queen_position.second}))) break;
-            else if(is_valid_move(Move(queen_position,{queen_position.first+d,queen_position.second}))) return true;
+        if(queen_position.first == -1) continue;
+        for(auto dir:queen_dirs){
+            Move move;move.from = queen_position;
+            for(int step=1;;step++){
+                move.to.first = queen_position.first+step*dir.first;
+                move.to.second = queen_position.second+step*dir.second;
+                if(!points_legal_move(move) || !piece_able_to_move(move)) break;
+                else if(is_valid_move(move)) return true;
+            }
         }
-        for(int d=1;true;d++){
-            if(!points_legal_move(Move(queen_position,{queen_position.first-d,queen_position.second})) || !piece_able_to_move(Move(queen_position,{queen_position.first-d,queen_position.second}))) break;
-            else if(is_valid_move(Move(queen_position,{queen_position.first-d,queen_position.second}))) return true;
-        }
-        for(int d=1;true;d++){
-            if(!points_legal_move(Move(queen_position,{queen_position.first,queen_position.second+d})) || !piece_able_to_move(Move(queen_position,{queen_position.first,queen_position.second+d}))) break;
-            else if(is_valid_move(Move(queen_position,{queen_position.first,queen_position.second+d}))) return true;
-        }
-        for(int d=1;true;d++){
-            if(!points_legal_move(Move(queen_position,{queen_position.first,queen_position.second-d})) || !piece_able_to_move(Move(queen_position,{queen_position.first,queen_position.second-d}))) break;
-            else if(is_valid_move(Move(queen_position,{queen_position.first,queen_position.second-d}))) return true;
-        }
-        for(int d=1;true;d++){
-            if(!points_legal_move(Move(queen_position,{queen_position.first+d,queen_position.second+d})) || !piece_able_to_move(Move(queen_position,{queen_position.first+d,queen_position.second+d}))) break;
-            else if(is_valid_move(Move(queen_position,{queen_position.first+d,queen_position.second+d}))) return true;
-        }
-        for(int d=1;true;d++){
-            if(!points_legal_move(Move(queen_position,{queen_position.first+d,queen_position.second-d})) || !piece_able_to_move(Move(queen_position,{queen_position.first+d,queen_position.second-d}))) break;
-            else if(is_valid_move(Move(queen_position,{queen_position.first+d,queen_position.second-d}))) return true;
-        }
-        for(int d=1;true;d++){
-            if(!points_legal_move(Move(queen_position,{queen_position.first-d,queen_position.second+d})) || !piece_able_to_move(Move(queen_position,{queen_position.first-d,queen_position.second+d}))) break;
-            else if(is_valid_move(Move(queen_position,{queen_position.first-d,queen_position.second+d}))) return true;
-        }
-        for(int d=1;true;d++){
-            if(!points_legal_move(Move(queen_position,{queen_position.first-d,queen_position.second-d})) || !piece_able_to_move(Move(queen_position,{queen_position.first-d,queen_position.second-d}))) break;
-            else if(is_valid_move(Move(queen_position,{queen_position.first-d,queen_position.second-d}))) return true;
+    }
+    return false;
+}
+
+bool Game::is_reachable(const std::pair<int,int>& position){
+    bool player_is_white = game_round%2==1;
+    const std::vector<std::vector<std::pair<int,int>>>& player_pieces = player_is_white ? white_pieces : black_pieces;
+    // exclude king 
+    for(size_t i=0;i<player_pieces.size()-1;i++){
+        for(auto piece_pos:player_pieces[i]){
+            if(piece_pos.first==-1 && piece_pos.second==-1) continue;
+            else{
+                if(is_valid_move(Move(piece_pos,position))) return true;
+            }
         }
     }
     return false;
@@ -451,26 +504,24 @@ Game::Game(){
     init_game_board_and_pieces();
 }
 
-bool Game::is_valid_move(const Move move) const{
+bool Game::is_valid_move(const Move move){
 
     // check1
     // moving piece 
     // target piece 
     if(!points_legal_move(move)){
-        std::cout << "Invalid Move!\n";
         return false; 
     }
 
     // check2
     // piece ability to move
-    if(!piece_able_to_move(move)){{
-        std::cout << "Invalid piece move!\n";
+    if(!piece_able_to_move(move)){
         return false; 
-    }}
+    }
+
     // check3 
     // does players king has checked
-    if(king_checked_move(move)){
-        std::cout << "King is checked!\n";
+    if(king_checked_move(move).first){
         return false; 
     }
 
@@ -479,21 +530,77 @@ bool Game::is_valid_move(const Move move) const{
 
 bool Game::is_ended(){
 
-    bool is_checked = king_checked_move(Move(),true); // instate check
-    std::cout << "next player is " <<( game_round%2 ? "white" : "black") ;
-    std::cout << " End of the round is next checked -> " << is_checked << std::endl;
-
-    // test all reachable positions and move if they break the check
-    bool any_move_found = any_possible_move();
-
-    if(!any_move_found){
-        bool player_is_white = game_round%2==1;
-        if(is_checked)  game_state = player_is_white ? 2 : 1 ;
-        else            game_state = 3 ;
+    auto check_info = king_checked_move(Move(),true); // instate check
+    if(check_info.first == 0){ // no check , possible stalemate
+        if(any_possible_move()) return false;
+        else{
+            game_state = 3;
+            return true;
+        }
+    }else if(check_info.first == 2){ //  
+        // TODO :  double check , king escape
+        std::pair<int,int> king_pos = game_round%2==1 ? (white_pieces[static_cast<int>(PieceType::king)][0]) : (black_pieces[static_cast<int>(PieceType::king)][0]);
+        std::vector<int> ways = {-1,0,1};
+        for(int a:ways){
+            for(int b:ways){
+                if(!a && !b) continue;
+                if(is_valid_move(Move(king_pos,{king_pos.first+a,king_pos.second+b}))) {
+                    return false;
+                }
+            }
+        }
+        // cur player = w -> b win , visa versa
+        game_state = game_state%2==1 ? 2 : 1; 
         return true;
+    }else if(check_info.first == 1){
+        // TODO : king escape or capture or check block
+        std::pair<int,int> king_pos = game_round%2==1 ? (white_pieces[static_cast<int>(PieceType::king)][0]) : (black_pieces[static_cast<int>(PieceType::king)][0]);
+        std::vector<int> ways = {-1,0,1};
+        for(int a:ways){
+            for(int b:ways){
+                if(!a && !b) continue;
+                if(is_valid_move(Move(king_pos,{king_pos.first+a,king_pos.second+b}))) {
+                    return false;
+                }
+            }
+        }
+
+        // know we need to examine checker 
+        // single point or line check
+        // single point(unblockable) : pawn, horse,  
+        // line check(blockable) : rook, bishop, queen  
+        Piece checker_piece = game_board[check_info.second.first][check_info.second.second];
+        std::pair<int,int> checker_pos = check_info.second;
+        if(checker_piece.get_piece_type() == PieceType::pawn 
+        || checker_piece.get_piece_type() == PieceType::horse)
+        {
+            if(is_reachable(check_info.second)) return false;
+        }
+        else if(checker_piece.get_piece_type() == PieceType::rook
+             || checker_piece.get_piece_type() == PieceType::bishop
+             || checker_piece.get_piece_type() == PieceType::queen)
+        {
+            int di = (king_pos.first-checker_pos.first);
+            int dj = (king_pos.second-checker_pos.second);
+            // we already know that di and dj valid this info came from king check control
+            // slopes are diag if bishop , hori,vert if rook , queen both
+            int slope_i = di ? di/abs(di) : 0;
+            int slope_j = dj ? dj/abs(dj) : 0;
+            for(auto cur_pos = checker_pos;cur_pos != king_pos;cur_pos.first+=slope_i,cur_pos.second+=slope_j){
+                if(is_reachable(cur_pos)) return false;
+            }
+        }
+        else
+        {
+            throw std::runtime_error("unexpected piece type for single check mate control");
+        }
+
+        game_state = game_round%2==1 ? 2 : 1; 
+        return true;
+    }else{
+        throw std::runtime_error("unexpected state");
     }
-    else return false;
-};
+}
 
 
 void Game::apply_move(Move move){
@@ -536,6 +643,7 @@ void Game::print_board() const{
             std::cout  << game_board[i][j].get_represent() << " " ;
         }std::cout << std::endl;
     }
+    if(!game_state)
     std::cout << "Player : " << ((game_round%2)?"white ":"black " ) << 
                     "| Round : " << (game_round+1)/2 << std::endl;
 
